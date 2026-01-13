@@ -23,7 +23,7 @@ FPS_APPROX = 20
 LINE_THICKNESS = 4
 BONE_THICKNESS = 2
 TEXT_SIZE = 1
-PINCH_THRESHOLD = 50  # distance in pixels, adjust for your camera resolution
+PINCH_THRESHOLD = 100  # distance in pixels, adjust for your camera resolution
 CAM_BOX_MARGIN = 0.2  # x% margin on each side
 # PERFORMANCE TIPS:
 # - Lower FPS_APPROX (e.g., 15) reduces processing frequency
@@ -52,11 +52,16 @@ _last_pinch = {}
 _smoothed = {}   # key = (hand_index, landmark_index) -> (x, y)
 SMOOTH_ALPHA = 0.65
 
+# Cached number tracking (persist text while updating less frequently)
+_last_number = None
+_last_number_pos = None
+
 #Toggles
 DRAW = True
 DRAW_PINCH_LINE = False
 SHOW_BBOX = True
 DRAW_LANDMARKS = True
+TRACK_NUMBERS = False
 _click_state = False  # track whether we are currently "holding click"
 
 # Mouse control
@@ -205,6 +210,19 @@ def hand_result_callback(result, output_image, timestamp_ms):
                                     (min(xs), min(ys)),
                                     (max(xs), max(ys)),
                                     (0, 255, 255), BONE_THICKNESS)
+                    
+            # --- Number tracking ---
+            if DRAW and TRACK_NUMBERS:
+                # Only update recognition every N frames to reduce CPU load
+                if _frame_counter % TEXT_RENDER_INTERVAL == 0:
+                    global _last_number, _last_number_pos
+                    _last_number = HandUtils.recognize_number(HandUtils.get_finger_states(hand_landmarks))
+                    _last_number_pos = (min(xs), min(ys)-10)
+                
+                # Draw the number every frame using cached value
+                if _last_number is not None and _last_number_pos is not None:
+                    cv2.putText(frame_rgb, f"Num: {_last_number}", _last_number_pos,
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), TEXT_SIZE + 5)
 
     # Convert RGB back to BGR for OpenCV             
     frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
@@ -235,7 +253,7 @@ def mouse_worker():
 
 
 def main():
-    global _latest_frame, DRAW_PINCH_LINE, SHOW_BBOX, DRAW_LANDMARKS, MOUSE_CONTROL, DRAW
+    global _latest_frame, DRAW_PINCH_LINE, SHOW_BBOX, DRAW_LANDMARKS, MOUSE_CONTROL, DRAW, TRACK_NUMBERS
     
     # start mouse thread
     _mouse_thread_stop = False
@@ -292,6 +310,11 @@ def main():
             #Quit 'q'
             if key == ord("q"):
                 break
+            
+            #Track numbers 'n'
+            if key == ord("n"):
+                TRACK_NUMBERS = not TRACK_NUMBERS
+                print("Number Tracking:", "ON" if TRACK_NUMBERS else "OFF")
 
             #Mouse control 'm'
             if key == ord("m"):
