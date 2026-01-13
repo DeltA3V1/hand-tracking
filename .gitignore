@@ -1,0 +1,20 @@
+# Virtual environments
+handenv/
+handenv_old/
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# MediaPipe models (optional if large)
+*.task
