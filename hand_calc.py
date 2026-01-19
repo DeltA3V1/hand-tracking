@@ -2,48 +2,59 @@ from hand_utils import HandUtils
 class HandCalc:
 
     @staticmethod
-    def minus(hand_landmarks, fingers):
-        return (
-            fingers["index"] and
-            not any([fingers["middle"], fingers["ring"], fingers["pinky"]]) and
-            hand_landmarks[8].x < hand_landmarks[6].x - 0.05
+    def only(hand_fingers, allowed):
+        return all(
+            (finger in allowed) == state
+            for finger, state in hand_fingers.items()
         )
+
     @staticmethod
-    def plus(hand_landmarks, fingers):
+    def minus(hand, f):
         return (
-        fingers["index"] and fingers["middle"] and
-        not any([fingers["ring"], fingers["pinky"]]) and
-        hand_landmarks[12].y < hand_landmarks[10].y - 0.05 and
-        hand_landmarks[8].y < hand_landmarks[6].y - 0.05
-    )
-    @staticmethod
-    def multiply(hand_landmarks, fingers):
-        return (
-            fingers["index"] and fingers["middle"] and fingers["ring"] and
-            not fingers["pinky"] and
-            HandUtils.finger_direction(hand_landmarks, 8, 6) in ["left", "right"] and
-            HandUtils.finger_direction(hand_landmarks, 12, 10) in ["left", "right"]
+            HandCalc.only(f, {"index"}) and
+            HandUtils.finger_direction(hand, 8, 6) == "left"
         )
+
     @staticmethod
-    def divide(hand_landmarks, fingers):
+    def plus(hand, f):
         return (
-            fingers["index"] and fingers["middle"] and fingers["ring"] and
-            not fingers["pinky"] and
-            HandUtils.finger_direction(hand_landmarks, 8, 6) in ["left", "right"] and
-            HandUtils.finger_direction(hand_landmarks, 12, 10) in ["left", "right"]
+            HandCalc.only(f, {"index", "middle"}) and
+            HandUtils.finger_direction(hand, 8, 6) == "left" and
+            HandUtils.finger_direction(hand, 12, 10) == "left"
         )
+
+    @staticmethod
+    def multiply(hand, f):
+        return (
+            HandCalc.only(f, {"index", "middle", "ring"}) and
+            HandUtils.finger_direction(hand, 8, 6) == "left" and
+            HandUtils.finger_direction(hand, 12, 10) == "left" and
+            HandUtils.finger_direction(hand, 16, 14) == "left"
+        )
+
+
+    @staticmethod
+    def divide(hand, f):
+        return (
+            HandCalc.only(f, {"index", "middle", "ring", "pinky"}) and
+            HandUtils.finger_direction(hand, 8, 6) == "left" and
+            HandUtils.finger_direction(hand, 12, 10) == "left" and
+            HandUtils.finger_direction(hand, 16, 14) == "left" and
+            HandUtils.finger_direction(hand, 20, 18) == "left"
+        )
+
     
     @staticmethod
-    def recognize(hand_landmarks, fingers):
-        if not any(fingers.values()):
+    def recognize_op(hand, f):
+        if not any(f.values()):
             return "="
-        if HandCalc.minus(hand_landmarks, fingers):
+        if HandCalc.minus(hand, f):
             return "-"
-        if HandCalc.plus(hand_landmarks, fingers):
+        if HandCalc.plus(hand, f):
             return "+"
-        if HandCalc.multiply(hand_landmarks, fingers):
+        if HandCalc.multiply(hand, f):
             return "*"
-        if HandCalc.divide(hand_landmarks, fingers):
+        if HandCalc.divide(hand, f):
             return "/"
 
         return None

@@ -38,6 +38,7 @@ class HandUtils:
     def lm_to_pixel(landmark, w, h):
         return int(landmark.x * w), int(landmark.y * h)
 
+    #returns if thumb is extended
     @staticmethod
     def thumb_extended(hand, handedness="Right"):
         tip = hand[4]
@@ -74,20 +75,46 @@ class HandUtils:
 
         return outward and not_across_palm
 
+    #returns if finger is extended
     @staticmethod
-    def get_finger_states(hand_landmarks):
+    def finger_extended(hand, tip, pip, mcp, threshold=0.04):
+        # Compare tip-to-MCP distance vs PIP-to-MCP
+        tip_dist = math.hypot(hand[tip].x - hand[mcp].x,
+                            hand[tip].y - hand[mcp].y)
+        pip_dist = math.hypot(hand[pip].x - hand[mcp].x,
+                            hand[pip].y - hand[mcp].y)
+
+        return tip_dist > pip_dist + threshold
+
+    #returns dictionary of finger states (extended or not)
+    @staticmethod
+    def get_finger_states(hand):
         fingers = {}
 
         # Index, middle, ring, pinky
-        fingers["index"]  = hand_landmarks[8].y < hand_landmarks[6].y
-        fingers["middle"] = hand_landmarks[12].y < hand_landmarks[10].y
-        fingers["ring"]   = hand_landmarks[16].y < hand_landmarks[14].y
-        fingers["pinky"]  = hand_landmarks[20].y < hand_landmarks[18].y
+        fingers["index"]  = HandUtils.finger_extended(hand, 8, 6, 5)
+        fingers["middle"] = HandUtils.finger_extended(hand, 12, 10, 9)
+        fingers["ring"]   = HandUtils.finger_extended(hand, 16, 14, 13)
+        fingers["pinky"]  = HandUtils.finger_extended(hand, 20, 18, 17)
 
         # Thumb (assume right hand for now)
-        fingers["thumb"] = HandUtils.thumb_extended(hand_landmarks)
+        fingers["thumb"] = HandUtils.thumb_extended(hand)
 
         return fingers
+
+    #returns finger direction
+    @staticmethod
+    def finger_direction(hand, tip, base, deadzone=0.02):
+        dx = hand[tip].x - hand[base].x
+        dy = hand[tip].y - hand[base].y
+
+        if abs(dx) < deadzone and abs(dy) < deadzone:
+            return "neutral"
+        
+        if abs(dx) > abs(dy):
+            return "left" if dx < 0 else "right"
+        else:
+            return "up" if dy < 0 else "down"
 
     @staticmethod
     def finger_code(f):
@@ -100,6 +127,19 @@ class HandUtils:
         return code
 
     @staticmethod
-    def recognize_number(f):
+    def all_extended_fingers_up(hand, f):
+        for finger, extended in f.items():
+            if not extended or finger == "thumb":
+                continue
+            tip = HandUtils.FINGER_TIPS[finger]
+            base = tip - 3
+            if HandUtils.finger_direction(hand, tip, base) != "up":
+                return False
+        return True
+
+    @staticmethod
+    def recognize_number(hand, f):
+        if not HandUtils.all_extended_fingers_up(hand, f):
+            return None
         code = HandUtils.finger_code(f)
         return HandUtils.NUMBER_MAP.get(code)

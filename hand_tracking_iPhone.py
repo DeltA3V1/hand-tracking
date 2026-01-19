@@ -13,6 +13,7 @@ from mediapipe.tasks.python.vision import (
 )
 from mediapipe.tasks.python.core.base_options import BaseOptions
 
+from hand_calc import HandCalc
 from hand_utils import HandUtils
 
 
@@ -23,7 +24,7 @@ FPS_APPROX = 20
 LINE_THICKNESS = 4
 BONE_THICKNESS = 2
 TEXT_SIZE = 1
-PINCH_THRESHOLD = 100  # distance in pixels, adjust for your camera resolution
+PINCH_THRESHOLD = 70  # distance in pixels, adjust for your camera resolution
 CAM_BOX_MARGIN = 0.2  # x% margin on each side
 # PERFORMANCE TIPS:
 # - Lower FPS_APPROX (e.g., 15) reduces processing frequency
@@ -56,12 +57,17 @@ SMOOTH_ALPHA = 0.65
 _last_number = None
 _last_number_pos = None
 
+# Cached calculator text and position
+_calc_text = None
+_calc_pos = None
+
 #Toggles
 DRAW = True
 DRAW_PINCH_LINE = False
 SHOW_BBOX = True
 DRAW_LANDMARKS = True
 TRACK_NUMBERS = False
+CALCULATOR = False
 _click_state = False  # track whether we are currently "holding click"
 
 # Mouse control
@@ -216,7 +222,7 @@ def hand_result_callback(result, output_image, timestamp_ms):
                 # Only update recognition every N frames to reduce CPU load
                 if _frame_counter % TEXT_RENDER_INTERVAL == 0:
                     global _last_number, _last_number_pos
-                    _last_number = HandUtils.recognize_number(HandUtils.get_finger_states(hand_landmarks))
+                    _last_number = HandUtils.recognize_number(hand_landmarks,HandUtils.get_finger_states(hand_landmarks))
                     _last_number_pos = (min(xs), min(ys)-10)
                 
                 # Draw the number every frame using cached value
@@ -224,6 +230,20 @@ def hand_result_callback(result, output_image, timestamp_ms):
                     cv2.putText(frame_rgb, f"Num: {_last_number}", _last_number_pos,
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), TEXT_SIZE + 5)
 
+            # --- Calculator ---
+            if DRAW and CALCULATOR:
+                if _frame_counter % TEXT_RENDER_INTERVAL == 0:
+                    global _calc_text, _calc_pos
+                    gesture = HandUtils.recognize_number(hand_landmarks, HandUtils.get_finger_states(hand_landmarks))
+                    operation = HandCalc.recognize_op(hand_landmarks, HandUtils.get_finger_states(hand_landmarks))
+                    _calc_text = f"Calc: {gesture if gesture is not None else ''}{operation if operation is not None else ''}"
+                    _calc_pos = (min(xs), max(ys)+30)
+                
+                # Draw the calculator operation every frame using cached value
+                if _calc_text is not None and _calc_pos is not None:
+                    cv2.putText(frame_rgb, _calc_text, _calc_pos,
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), TEXT_SIZE + 5)
+                    
     # Convert RGB back to BGR for OpenCV             
     frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
     # Store into shared buffer (thread-safe)
@@ -253,7 +273,7 @@ def mouse_worker():
 
 
 def main():
-    global _latest_frame, DRAW_PINCH_LINE, SHOW_BBOX, DRAW_LANDMARKS, MOUSE_CONTROL, DRAW, TRACK_NUMBERS
+    global _latest_frame, DRAW_PINCH_LINE, SHOW_BBOX, DRAW_LANDMARKS, MOUSE_CONTROL, DRAW, TRACK_NUMBERS, CALCULATOR
     
     # start mouse thread
     _mouse_thread_stop = False
@@ -337,7 +357,11 @@ def main():
                 DRAW_PINCH_LINE = not DRAW_PINCH_LINE
                 print("Pinch line:", "ON" if DRAW_PINCH_LINE else "OFF")
 
-
+            # Calculator 'c'
+            if key == ord("c"):
+                CALCULATOR = not CALCULATOR
+                print("Calculator:", "ON" if CALCULATOR else "OFF")
+            
             # small sleep to yield CPU (keeps loop pacing closer to FPS_APPROX)
             time.sleep(frame_interval_ms / 1000.0)
 
