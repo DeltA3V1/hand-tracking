@@ -1,4 +1,4 @@
-# hand_tracking_iPhone_fixed.py
+# hand_tracking_cam.py
 import threading
 import time
 from pathlib import Path
@@ -237,7 +237,7 @@ def hand_result_callback(result, output_image, timestamp_ms):
                     gesture = HandUtils.recognize_number(hand_landmarks, HandUtils.get_finger_states(hand_landmarks))
                     operation = HandCalc.recognize_op(hand_landmarks, HandUtils.get_finger_states(hand_landmarks))
                     _calc_text = f"Calc: {gesture if gesture is not None else ''}{operation if operation is not None else ''}"
-                    _calc_pos = (min(xs), max(ys)+30)
+                    _calc_pos = (0.1*w, 0.9*h)
                 
                 # Draw the calculator operation every frame using cached value
                 if _calc_text is not None and _calc_pos is not None:
